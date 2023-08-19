@@ -338,15 +338,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 475292cc518f9fc46a489e7187791a68, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  noiseScale: 0.1
+  defaultThreshold: 0.05
   hexTilePrefab: {fileID: 980702013641307087, guid: 7df93851f46519c4fac98c9fb181c9d1, type: 3}
-  width: 10
-  height: 10
+  width: 50
+  height: 50
   tileSpacing: 1.1
-  materials:
+  lv1Materials:
   - {fileID: 2100000, guid: f1ff09f45c8bfc5458d486632a8dc1b5, type: 2}
   - {fileID: 2100000, guid: e727b7a170a9b454ba042709800ce281, type: 2}
   - {fileID: 2100000, guid: 1f6fa9d79afb08c42a8cd44457e22a72, type: 2}
   - {fileID: 2100000, guid: ecd4ce40582b63d45bb13bef67938330, type: 2}
+  lv2Materials: []
+  lv3Materials: []
 --- !u!4 &1492790035
 Transform:
   m_ObjectHideFlags: 0
