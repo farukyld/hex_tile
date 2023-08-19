@@ -10,6 +10,7 @@ public class TileGenerator : MonoBehaviour
 
     public float level2StartingRadius = 20f; // Adjust these values to determine when each level starts.
     public float level3StartingRadius = 40f;
+    public float fadeWidth = 5f; // The width of the fading region. Adjust this for a broader/narrower fade.
 
     public GameObject hexTilePrefab; // Drag and drop your hex tile prefab here in inspector
     public int width = 10; // Number of tiles in x-direction
@@ -48,14 +49,51 @@ public class TileGenerator : MonoBehaviour
                 Vector3 pos = new Vector3(xPos, 0, zPos);
                 var obj = Instantiate(hexTilePrefab, pos, Quaternion.identity, this.transform);
                 obj.gameObject.name = "tile" + x + " " + z;
-             
-                Biome biome = GetBiomeForPosition(xPos, zPos);
-                Material tileMaterial = lv1Materials[(int)biome];
+
+                float distanceToCenter = Vector3.Distance(pos, center);
+                List<Material> currentMaterials = GetMaterialsBasedOnDistance(distanceToCenter);
+
+
+
+                Biome biome = GetBiomeForPosition(xPos, zPos); 
+                Material tileMaterial = currentMaterials[(int)biome];
+
                 var list = new List<Material>() { tileMaterial, tileMaterial };
                 obj.GetComponent<Renderer>().materials = list.ToArray();
             }
         }
     }
+
+    List<Material> GetMaterialsBasedOnDistance(float distance)
+    {
+        float distanceToLevel2Boundary = Math.Abs(distance - level2StartingRadius);
+        float distanceToLevel3Boundary = Math.Abs(distance - level3StartingRadius);
+
+        if (distanceToLevel2Boundary < fadeWidth)
+        {
+            // Probabilistic decision based on how close we are to the boundary
+            float fadeFactor = distanceToLevel2Boundary / fadeWidth;
+            return UnityEngine.Random.value < fadeFactor ? lv1Materials : lv2Materials;
+        }
+        else if (distanceToLevel3Boundary < fadeWidth)
+        {
+            float fadeFactor = distanceToLevel3Boundary / fadeWidth;
+            return UnityEngine.Random.value < fadeFactor ? lv2Materials : lv3Materials;
+        }
+        else if (distance < level2StartingRadius)
+        {
+            return lv1Materials;
+        }
+        else if (distance < level3StartingRadius)
+        {
+            return lv2Materials;
+        }
+        else
+        {
+            return lv3Materials;
+        }
+    }
+
 
     Biome GetBiomeForPosition(float x, float z)
     {
