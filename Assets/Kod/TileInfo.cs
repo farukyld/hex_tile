@@ -9,6 +9,9 @@ public class ChunkBilgi : MonoBehaviour
     public ChunkBilgi[,] hexTilesReference;
     public List<ChunkBilgi> neighboringTiles;
 
+    public Element nextElement;
+    public Vector2Int nextCellLocation;
+
     public void ExtractNeighbors()
     {
         neighboringTiles = new List<ChunkBilgi>();

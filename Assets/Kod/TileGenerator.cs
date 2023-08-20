@@ -1,12 +1,30 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Xml.Linq;
+using Unity.VisualScripting.Antlr3.Runtime.Tree;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
 public class TileGenerator : MonoBehaviour
 {
+    public int seed;
+
+    [Header("Boundary Adjustment")]
+    public bool enableBoundaryDistortion = true;
+    public DistortionMode distortionMode = DistortionMode.UnityRandom;
+    public enum DistortionMode { UnityRandom, PerlinNoise };
+    public float perlinScale = 0.1f;
+    public float perlinStrength = 1;
+
+    public float unityRandomStrength = 1.2f;
+    public float maxDistortionPenetration = 5.0f;
+
+    public bool enableSmoothening = true;
+    public int smootheningIterations = 4;
+    public int changeTypeWhenCountIs = 3;
+
     [Header("Biome Set Up")]
     public Transform cellPositionParent;
     public int biomeWidth;  // Width in number of cells
@@ -23,9 +41,37 @@ public class TileGenerator : MonoBehaviour
     public int tileWidth;
     public float tileSpacing;
     public float defaultTileProbability = .1f;
+    [HideInInspector] public Transform baseTile;
+
+    [ContextMenu("Update Grid")]
+
+    private void UpdateGrid()
+    {
+        GenerateGrid();
+
+        if (enableBoundaryDistortion)
+        {
+            DistortBoundaries();
+            // smoothen boundaries.
+        }
+
+        AssignTileBiomeAppearances();
+
+    }
 
     private void Start()
     {
+        if (tileWidth %  2 == 0)
+        {
+            tileWidth++;
+        }
+
+        if (tileHeigth % 2 == 0)
+        {
+            tileHeigth++;
+        }
+
+        Random.InitState(seed);
 
         GenerateVoronoiPoints();
 
@@ -33,7 +79,31 @@ public class TileGenerator : MonoBehaviour
 
         GenerateGrid();
 
-        ScatterDefaultTiles();
+
+        // save Random state
+        Random.State originalState = Random.state;
+
+        var middlePartTypeAndCellLocationArray = MiddlePartTypeAndCellLocationArray(size: 4);// size is how many tiles are gonna be saved.
+
+        if (enableBoundaryDistortion)
+            // the distort boundaries uses the distortionMode option to decide to use perlinNoise or Random
+            DistortBoundaries();
+            // smoothen boundaries.
+
+        // reset the Random state to previously saved one, because we may or may not have used Random class inside DistortBoundaries.
+        Random.state = originalState;
+
+        if (enableSmoothening)
+            SmoothenBoundaries(smootheningIterations); // using conwey's game of life algo. to be implemented.
+
+        ScatterRandomDefaultTiles();
+
+        ApplyMiddlePartTypeAndCellLocation(size: 4, info: middlePartTypeAndCellLocationArray);
+
+        baseTile = hexTiles[tileWidth / 2, tileHeigth / 2].transform;
+
+        baseTile.GetComponent<ChunkBilgi>().element = Element.None;
+        baseTile.name = "BASE TILE";
 
         AssignTileBiomeAppearances();
 
@@ -75,8 +145,6 @@ public class TileGenerator : MonoBehaviour
         float maxX = biomeWidth * biomeSize * 0.5f;
         float minZ = -biomeHeigth * biomeSize * 0.5f;
         float maxZ = biomeHeigth * biomeSize * 0.5f;
-        print(minX + ", " + maxX + ", " + minZ + ", " + maxZ);
-        print(position);
 
         // Clamp the position inside the shifted area allocated for feature points
         position.x = Mathf.Clamp(position.x, minX, maxX);
@@ -87,7 +155,6 @@ public class TileGenerator : MonoBehaviour
         int x = Mathf.FloorToInt(position.x / biomeSize) + biomeWidth / 2; // Using size because it's the expected edge length of a Voronoi cell
         int y = Mathf.FloorToInt(position.z / biomeSize) + biomeHeigth / 2;
 
-        print(x + ", " + y);
         // Find the neighboring voronoi points in the grid
         Vector2Int[] surroundingPoints = new Vector2Int[]
         {
@@ -202,9 +269,7 @@ public class TileGenerator : MonoBehaviour
 
     private void DistortBoundaries()
     {
-        // Define a scale for the Perlin noise
-        float perlinScale = 0.1f;
-
+        // I moved the scale definition to be a class field 
         for (int x = 0; x < tileWidth; x++)
         {
             for (int y = 0; y < tileHeigth; y++)
@@ -212,15 +277,24 @@ public class TileGenerator : MonoBehaviour
                 ChunkBilgi tile = hexTiles[x, y];
 
                 // Generate a Perlin noise value for the tile position
-                float noiseValue = Mathf.PerlinNoise(tile.transform.position.x * perlinScale, tile.transform.position.z * perlinScale);
+                float noiseValue = distortionMode == DistortionMode.PerlinNoise ?
+                    perlinStrength * Mathf.PerlinNoise(tile.transform.position.x * perlinScale, tile.transform.position.z * perlinScale)
+                    : unityRandomStrength * Random.value;
 
-                // If the Perlin noise value exceeds a threshold, we change the tile's type
+                Vector2Int secondClosestCell = FindSecondClosestCell(tile.transform.position);
+
+                float distanceToClosestCell = Vector3.Distance(featurePoints[tile.cellLocation.x, tile.cellLocation.y], tile.transform.position);
+                float distanceToSecondClosestCell = Vector3.Distance(featurePoints[secondClosestCell.x, secondClosestCell.y], tile.transform.position);
+
+                if (distanceToSecondClosestCell - distanceToClosestCell > maxDistortionPenetration)
+                    continue;
+                // If the noise value exceeds a threshold, we change the tile's type
                 if (noiseValue > 0.5f)
                 {
-                    Vector2Int secondClosestCell = FindSecondClosestCell(tile.transform.position);
                     if (secondClosestCell != new Vector2Int(-1, -1)) // ensure we found a valid second closest cell
                     {
                         tile.element = initialLocationBiomes[secondClosestCell.x, secondClosestCell.y];
+                        tile.cellLocation = secondClosestCell;
                     }
                 }
             }
@@ -269,6 +343,81 @@ public class TileGenerator : MonoBehaviour
         return secondClosestCell;
     }
 
+    private void SmoothenBoundaries(int iterations)
+    {
+        for (int i = 0; i < iterations; i++)
+        {
+            // Phase 1: Decide the next type for each tile
+            foreach (ChunkBilgi tile in hexTiles)
+            {
+                Element dominantType = GetDominantNeighborType(tile);
+                if (dominantType != Element.None) // assuming you have an "None" or "Undefined" type
+                {
+                    tile.nextElement = dominantType;
+                }
+                else
+                {
+                    tile.nextElement = tile.element; // retains its current type if no dominant type found
+                }
+            }
+
+            // Phase 2: Update the tiles
+            foreach (ChunkBilgi tile in hexTiles)
+            {
+                tile.element = tile.nextElement;
+            }
+        }
+    }
+
+    private Element GetDominantNeighborType(ChunkBilgi tile)
+    {
+        Dictionary<Element, int> typeCounts = new Dictionary<Element, int>();
+        foreach (ChunkBilgi neighbor in tile.neighboringTiles)
+        {
+            if (!typeCounts.ContainsKey(neighbor.element))
+            {
+                typeCounts[neighbor.element] = 0;
+            }
+            typeCounts[neighbor.element]++;
+        }
+
+        // This will filter types seen more than 3 times and then select the one with the highest count.
+        return typeCounts.Where(kvp => kvp.Value > changeTypeWhenCountIs).OrderByDescending(kvp => kvp.Value).FirstOrDefault().Key;
+    }
+
+    private (Element, Vector2Int)[,] MiddlePartTypeAndCellLocationArray(int size)
+    {
+        (Element, Vector2Int)[,] selectedTiles = new (Element, Vector2Int)[size, size];
+
+        int startX = tileWidth / 2 - size / 2;
+        int startY = tileHeigth / 2 - size / 2;
+
+        for (int i = 0; i < size; i++)
+        {
+            for (int j = 0; j < size; j++)
+            {
+                selectedTiles[i, j].Item1 = hexTiles[startX + i, startY + j].element;
+                selectedTiles[i, j].Item2 = hexTiles[startX + i, startY + j].cellLocation;
+            }
+        }
+
+        return selectedTiles;
+    }
+
+    private void ApplyMiddlePartTypeAndCellLocation(int size, (Element, Vector2Int)[,] info)
+    {
+        int startX = tileWidth / 2 - size / 2;
+        int startY = tileHeigth / 2 - size / 2;
+
+        for (int i = 0; i < size; i++)
+        {
+            for (int j = 0; j < size; j++)
+            {
+                hexTiles[startX + i, startY + j].element = info[i, j].Item1;
+                hexTiles[startX + i, startY + j].cellLocation = info[i, j].Item2;
+            }
+        }
+    }
 
 
 
@@ -312,7 +461,7 @@ public class TileGenerator : MonoBehaviour
         }
     }
 
-    void ScatterDefaultTiles()
+    void ScatterRandomDefaultTiles()
     {
         // 1. Scattering Default Type Tiles:
         foreach (var tile in hexTiles)
@@ -323,9 +472,6 @@ public class TileGenerator : MonoBehaviour
                 tile.GetComponent<ChunkBilgi>().element = Element.None;
             }
         }
-
-        // 2. Making the Middle Tile Default:
-        hexTiles[tileWidth / 2, tileHeigth / 2].GetComponent<ChunkBilgi>().element = Element.None;
     }
 
     void AssignTileBiomeAppearances()
@@ -346,7 +492,6 @@ public class TileGenerator : MonoBehaviour
                 List<Material> materials = GetMaterialsBasedOnDistance(distance);
 
 
-                print((int)cb.element);
                 // Choose a specific material from the list based on the tile's biome. 
                 Material assignedMaterial = materials[(int)cb.element];
 
@@ -361,8 +506,8 @@ public class TileGenerator : MonoBehaviour
 public enum Element
 {
     None,
-    Ates, 
-    Su, 
-    Toprak, 
+    Ates,
+    Su,
+    Toprak,
     Hava
 }
