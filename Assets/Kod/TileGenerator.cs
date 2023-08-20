@@ -2,44 +2,180 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 public class TileGenerator : MonoBehaviour
 {
-    public float noiseScale = 0.1f; // Adjust for smoother or more jagged transitions
-    public float defaultThreshold = 0.05f; // Value under which a tile is set as default (unexplored)
-
-    public float level2StartingRadius = 20f; // Adjust these values to determine when each level starts.
-    public float level3StartingRadius = 40f;
-    public float fadeWidth = 5f; // The width of the fading region. Adjust this for a broader/narrower fade.
-
-    public GameObject hexTilePrefab; // Drag and drop your hex tile prefab here in inspector
-    public int width = 10; // Number of tiles in x-direction
-    public int height = 10; // Number of tiles in z-direction
-    public float tileSpacing = 1.0f; // Gap between tiles, you can adjust this based on your hexagon's size
-    public List<Material> lv1Materials;
-    public List<Material> lv2Materials;
-    public List<Material> lv3Materials;
+    public bool debugTilePos;
+    public bool debugCellPos;
+    [Header("Biome Set Up")]
+    public Transform cellPositionParent;
+    public int biomeWidth;  // Width in number of cells
+    public int biomeHeigth;  // Height in number of cells
+    public float biomeSize;  // The expected edge length of a Voronoi cell
+    [Range(min: 0f, max: .5f)] public float voronoiDistortionFactor = 0.5f;  // The range to shift the Voronoi points
+    private Vector3[,] featurePoints;  // 2D array of Voronoi feature points
 
 
+    [Header("Tile Grid Set Up")]
+    public Transform tilePositionParent;
+    public Transform tileParent;
+    public int tileHeigth;
+    public int tileWidth;
+    public float tileSpacing;
+    public GameObject hexTilePrefab;
 
     private void Start()
     {
+
+        GenerateVoronoiPoints();
+
+        AssignInitialBiomes();
+
         GenerateGrid();
+
+        AssignTileBiomeAppearances();
+
     }
+    void GenerateVoronoiPoints()
+    {
+        featurePoints = new Vector3[biomeWidth, biomeHeigth];
+
+        for (int x = 0; x < biomeWidth; x++)
+        {
+            for (int y = 0; y < biomeHeigth; y++)
+            {
+                // Calculate the base position for each point (center of each cell)
+                Vector3 basePos = new Vector3(x * biomeSize, 0, y * biomeSize) - new Vector3(biomeWidth * biomeSize * 0.5f, 0, biomeHeigth * biomeSize * 0.5f) + new Vector3(biomeSize * .5f, 0, biomeSize * .5f); ;
+
+
+                // If it's the four center points, don't distort them
+                if ((x == biomeWidth / 2 || x == biomeWidth / 2 - 1) && (y == biomeHeigth / 2 || y == biomeHeigth / 2 - 1))
+                {
+                    featurePoints[x, y] = basePos;
+                }
+                else
+                {
+                    // Shift the position based on the distortion factor
+                    Vector3 randomOffset = new Vector3(Random.Range(-voronoiDistortionFactor, voronoiDistortionFactor), 0, Random.Range(-voronoiDistortionFactor, voronoiDistortionFactor)) * biomeSize;
+                    featurePoints[x, y] = basePos + randomOffset;
+                }
+                if (debugCellPos)
+                {
+                    var debug = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    debug.transform.position = featurePoints[x, y];
+                    debug.transform.localScale = Vector3.one * 1f;
+                    debug.transform.parent = cellPositionParent;
+                    debug.name = "Cell Center (" + x + ", " + y + ")";
+                }
+
+            }
+        }
+    }
+
+
+    private Vector2Int DetermineVoronoiCell(Vector3 position)
+    {
+        //!!!! --->> clamp the position inside the area allocated for featurepoints here.
+
+        // Define the boundaries of the shifted area
+        float minX = -biomeWidth * biomeSize * 0.5f;
+        float maxX = biomeWidth * biomeSize * 0.5f;
+        float minZ = -biomeHeigth * biomeSize * 0.5f;
+        float maxZ = biomeHeigth * biomeSize * 0.5f;
+        print(minX + ", "+ maxX + ", "+  minZ + ", "+ maxZ);
+        print(position);
+
+        // Clamp the position inside the shifted area allocated for feature points
+        position.x = Mathf.Clamp(position.x, minX, maxX);
+        position.z = Mathf.Clamp(position.z, minZ, maxZ);
+
+
+        // Convert the continuous space into grid indices
+        int x = Mathf.FloorToInt(position.x / biomeSize) + 5; // Using size because it's the expected edge length of a Voronoi cell
+        int y = Mathf.FloorToInt(position.z / biomeSize) + 5;
+
+        print(x + ", " + y);
+        // Find the neighboring voronoi points in the grid
+        Vector2Int[] surroundingPoints = new Vector2Int[]
+        {
+        new Vector2Int(x, y),
+        new Vector2Int(x+1, y),
+        new Vector2Int(x-1, y),
+        new Vector2Int(x, y+1),
+        new Vector2Int(x, y-1),
+        new Vector2Int(x+1, y+1),
+        new Vector2Int(x-1, y-1),
+        new Vector2Int(x-1, y+1),
+        new Vector2Int(x+1, y-1)
+        };
+
+        float minDistance = float.MaxValue;
+        Vector2Int closestCell = new Vector2Int(-1, -1);
+
+        // Determine the closest voronoi point
+        foreach (var point in surroundingPoints)
+        {
+            if (point.x >= 0 && point.x < biomeWidth && point.y >= 0 && point.y < biomeHeigth)
+            {
+                float dist = Vector3.Distance(position, featurePoints[point.x, point.y]);
+                if (dist < minDistance)
+                {
+                    minDistance = dist;
+                    closestCell = point;
+                }
+            }
+        }
+        return closestCell;
+    }
+
+
+
+    private Biome[,] initialLocationBiomes;
+
+    void AssignInitialBiomes()
+    {
+        initialLocationBiomes = new Biome[biomeWidth, biomeHeigth];
+        List<Biome> centerBiomes = new List<Biome> { Biome.Terra, Biome.Water, Biome.Fire, Biome.Auro };
+
+        for (int x = 0; x < biomeWidth; x++)
+        {
+            for (int y = 0; y < biomeHeigth; y++)
+            {
+                // If it's the four center points, assign them a unique biome
+                if ((x == biomeWidth / 2 || x == biomeWidth / 2 - 1) && (y == biomeHeigth / 2 || y == biomeHeigth / 2 - 1))
+                {
+                    int randomIndex = Random.Range(0, centerBiomes.Count);
+                    initialLocationBiomes[x, y] = centerBiomes[randomIndex];
+                    centerBiomes.RemoveAt(randomIndex);  // Remove the biome to ensure uniqueness
+                }
+                else
+                {
+                    // For other points, assign a random biome (excluding the Default biome)
+                    initialLocationBiomes[x, y] = (Biome)Random.Range(1, Enum.GetValues(typeof(Biome)).Length);
+                }
+            }
+        }
+    }
+
+
+
+
+
+    TileInfo[,] hexTiles;
 
     void GenerateGrid()
     {
-        Vector3 center = new Vector3(width * tileSpacing * 0.75f, 0, height * tileSpacing * Mathf.Sqrt(3) * 0.5f); // Approximate center
+        hexTiles = new TileInfo[tileWidth, tileHeigth];
 
-
-        for (int x = 0; x < width; x++)
+        for (int x = 0; x < tileWidth; x++)
         {
-            for (int z = 0; z < height; z++)
+            for (int y = 0; y < tileHeigth; y++)
             {
                 // Calculate the position for the hex tile
                 float xPos = x * tileSpacing * 1.5f;
-                float zPos = z * tileSpacing * Mathf.Sqrt(3);
-                
+                float zPos = y * tileSpacing * Mathf.Sqrt(3);
+
                 // If it's an odd column, offset it to fit hexagonal pattern
                 if (x % 2 == 1)
                 {
@@ -47,22 +183,55 @@ public class TileGenerator : MonoBehaviour
                 }
 
                 Vector3 pos = new Vector3(xPos, 0, zPos);
+                pos -= new Vector3(tileWidth * tileSpacing * 0.75f, 0, tileHeigth * tileSpacing * Mathf.Sqrt(3) * 0.5f);
+
                 var obj = Instantiate(hexTilePrefab, pos, Quaternion.identity, this.transform);
-                obj.gameObject.name = "tile" + x + " " + z;
+                obj.gameObject.name = "tile" + x + " " + y;
 
-                float distanceToCenter = Vector3.Distance(pos, center);
-                List<Material> currentMaterials = GetMaterialsBasedOnDistance(distanceToCenter);
+                var tileInfo = obj.GetComponent<TileInfo>();
+                tileInfo.tileIndex = new Vector2Int(x, y);
+                tileInfo.hexTilesReference = hexTiles;
 
+                Vector2Int cellLocation = DetermineVoronoiCell(pos); // !!!! --->> this part may return outside of range index for now. 
 
+                if (debugTilePos)
+                {
+                    var debug = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    debug.transform.parent = this.transform;
+                    debug.transform.position = pos;
+                    var m = debug.GetComponent<Renderer>().material;
+                    m.color = Color.red;
+                    debug.GetComponent<Renderer>().material = m;
+                    debug.name = "tile position: (" + x + ", " + y + ")";
+                    debug.transform.parent = tilePositionParent; 
+                }
+                tileInfo.cellLocation = cellLocation;
+                tileInfo.tileType = initialLocationBiomes[cellLocation.x, cellLocation.y];
+                tileInfo.transform.parent = tileParent;
+                hexTiles[x, y] = tileInfo;
+            }
+        }
 
-                Biome biome = GetBiomeForPosition(xPos, zPos); 
-                Material tileMaterial = currentMaterials[(int)biome];
-
-                var list = new List<Material>() { tileMaterial, tileMaterial };
-                obj.GetComponent<Renderer>().materials = list.ToArray();
+        // Extract neighbors for each tile
+        for (int x = 0; x < tileWidth; x++)
+        {
+            for (int y = 0; y < tileHeigth; y++)
+            {
+                hexTiles[x, y].ExtractNeighbors();
             }
         }
     }
+
+
+
+
+    public float level2StartingRadius = 40f; // Adjust these values to determine when each level starts.
+    public float level3StartingRadius = 80f;
+    public float fadeWidth = 15f; // The width of the fading region. Adjust this for a broader/narrower fade.
+
+    public List<Material> lv1Materials;
+    public List<Material> lv2Materials;
+    public List<Material> lv3Materials;
 
     List<Material> GetMaterialsBasedOnDistance(float distance)
     {
@@ -72,13 +241,15 @@ public class TileGenerator : MonoBehaviour
         if (distanceToLevel2Boundary < fadeWidth)
         {
             // Probabilistic decision based on how close we are to the boundary
-            float fadeFactor = distanceToLevel2Boundary / fadeWidth;
-            return UnityEngine.Random.value < fadeFactor ? lv1Materials : lv2Materials;
+            float distanceToFadeBeginning = distance - (level2StartingRadius - fadeWidth);
+            float fadeFactor = distanceToFadeBeginning / (fadeWidth * 2);
+            return UnityEngine.Random.value > fadeFactor ? lv1Materials : lv2Materials;
         }
         else if (distanceToLevel3Boundary < fadeWidth)
         {
-            float fadeFactor = distanceToLevel3Boundary / fadeWidth;
-            return UnityEngine.Random.value < fadeFactor ? lv2Materials : lv3Materials;
+            float distanceToFadeBeginning = distance - (level3StartingRadius - fadeWidth);
+            float fadeFactor = distanceToFadeBeginning / (fadeWidth * 2);
+            return UnityEngine.Random.value > fadeFactor ? lv2Materials : lv3Materials;
         }
         else if (distance < level2StartingRadius)
         {
@@ -95,16 +266,32 @@ public class TileGenerator : MonoBehaviour
     }
 
 
-    Biome GetBiomeForPosition(float x, float z)
+
+    void AssignTileBiomeAppearances()
     {
-        float noiseValue = Mathf.PerlinNoise(x * noiseScale, z * noiseScale);
+        Vector3 center = Vector3.zero;
 
-        if (noiseValue < defaultThreshold) return Biome.Default;
+        for (int x = 0; x < tileWidth; x++)
+        {
+            for (int y = 0; y < tileHeigth; y++)
+            {
+                TileInfo tile = hexTiles[x, y];
 
-        float increment = 1f / (Enum.GetValues(typeof(Biome)).Length - 1);
-        int biomeIndex = Mathf.Clamp(Mathf.FloorToInt(noiseValue / increment), 1, lv1Materials.Count - 1);
+                // Calculate the distance from the tile to the center
+                float distance = Vector3.Distance(tile.transform.position, center);
 
-        return (Biome)biomeIndex;
+                // Get the materials based on distance
+                List<Material> materials = GetMaterialsBasedOnDistance(distance);
+
+
+                print((int)tile.tileType);
+                // Choose a specific material from the list based on the tile's biome. 
+                Material assignedMaterial = materials[(int)tile.tileType];
+
+                var doubleMaterial = new List<Material>() { assignedMaterial, assignedMaterial };
+                tile.GetComponent<Renderer>().materials = doubleMaterial.ToArray();
+            }
+        }
     }
 
 

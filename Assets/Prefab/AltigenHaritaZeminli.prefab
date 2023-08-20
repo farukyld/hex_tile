@@ -94,6 +94,7 @@ GameObject:
   - component: {fileID: 4489597413310248287}
   - component: {fileID: 1194707216940117492}
   - component: {fileID: 55691685735756353}
+  - component: {fileID: 338774357156197646}
   m_Layer: 0
   m_Name: AltigenHaritaZeminli
   m_TagString: Untagged
@@ -173,6 +174,22 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &338774357156197646
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 980702013641307087}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8943395ab4d0b9c4a89473d73b1cdca2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cellLocation: {x: 0, y: 0}
+  tileIndex: {x: 0, y: 0}
+  tileType: 0
+  neighboringTiles: []
 --- !u!1 &2375731737616875063
 GameObject:
   m_ObjectHideFlags: 0
