@@ -1,17 +1,17 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-public class TileInfo : MonoBehaviour
+public class ChunkBilgi : MonoBehaviour
 {
     public Vector2Int cellLocation; // Biome location in 2D array
     public Vector2Int tileIndex;    // Tile location in HexTiles 2D array
-    public TileGenerator.Biome tileType;
-    public TileInfo[,] hexTilesReference;
-    public List<TileInfo> neighboringTiles;
+    public Element element;
+    public ChunkBilgi[,] hexTilesReference;
+    public List<ChunkBilgi> neighboringTiles;
 
     public void ExtractNeighbors()
     {
-        neighboringTiles = new List<TileInfo>();
+        neighboringTiles = new List<ChunkBilgi>();
 
         // Top and Bottom in the same column
         AddNeighbor(tileIndex.x, tileIndex.y - 1);

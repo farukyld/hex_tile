@@ -1,12 +1,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Xml.Linq;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
 public class TileGenerator : MonoBehaviour
 {
-    public int seed = 123456;
     public bool debugTilePos;
     public bool debugCellPos;
     [Header("Biome Set Up")]
@@ -29,7 +29,6 @@ public class TileGenerator : MonoBehaviour
 
     private void Start()
     {
-        Random.InitState(seed);
 
         GenerateVoronoiPoints();
 
@@ -88,7 +87,7 @@ public class TileGenerator : MonoBehaviour
         float maxX = biomeWidth * biomeSize * 0.5f;
         float minZ = -biomeHeigth * biomeSize * 0.5f;
         float maxZ = biomeHeigth * biomeSize * 0.5f;
-        print(minX + ", "+ maxX + ", "+  minZ + ", "+ maxZ);
+        print(minX + ", " + maxX + ", " + minZ + ", " + maxZ);
         print(position);
 
         // Clamp the position inside the shifted area allocated for feature points
@@ -136,12 +135,12 @@ public class TileGenerator : MonoBehaviour
 
 
 
-    private Biome[,] initialLocationBiomes;
+    private Element[,] initialLocationBiomes;
 
     void AssignInitialBiomes()
     {
-        initialLocationBiomes = new Biome[biomeWidth, biomeHeigth];
-        List<Biome> centerBiomes = new List<Biome> { Biome.Terra, Biome.Water, Biome.Fire, Biome.Auro };
+        initialLocationBiomes = new Element[biomeWidth, biomeHeigth];
+        List<Element> centerBiomes = new List<Element> { Element.Ates, Element.Su, Element.Toprak, Element.Hava };
 
         for (int x = 0; x < biomeWidth; x++)
         {
@@ -157,21 +156,18 @@ public class TileGenerator : MonoBehaviour
                 else
                 {
                     // For other points, assign a random biome (excluding the Default biome)
-                    initialLocationBiomes[x, y] = (Biome)Random.Range(1, Enum.GetValues(typeof(Biome)).Length);
+                    initialLocationBiomes[x, y] = (Element)Random.Range(1, Enum.GetValues(typeof(Element)).Length);
                 }
             }
         }
     }
 
 
-
-
-
-    TileInfo[,] hexTiles;
+    ChunkBilgi[,] hexTiles;
 
     void GenerateGrid()
     {
-        hexTiles = new TileInfo[tileWidth, tileHeigth];
+        hexTiles = new ChunkBilgi[tileWidth, tileHeigth];
 
         for (int x = 0; x < tileWidth; x++)
         {
@@ -193,7 +189,7 @@ public class TileGenerator : MonoBehaviour
                 var obj = Instantiate(hexTilePrefab, pos, Quaternion.identity, this.transform);
                 obj.gameObject.name = "tile" + x + " " + y;
 
-                var tileInfo = obj.GetComponent<TileInfo>();
+                var tileInfo = obj.GetComponent<ChunkBilgi>();
                 tileInfo.tileIndex = new Vector2Int(x, y);
                 tileInfo.hexTilesReference = hexTiles;
 
@@ -208,10 +204,10 @@ public class TileGenerator : MonoBehaviour
                     m.color = Color.red;
                     debug.GetComponent<Renderer>().material = m;
                     debug.name = "tile position: (" + x + ", " + y + ")";
-                    debug.transform.parent = tilePositionParent; 
+                    debug.transform.parent = tilePositionParent;
                 }
                 tileInfo.cellLocation = cellLocation;
-                tileInfo.tileType = initialLocationBiomes[cellLocation.x, cellLocation.y];
+                tileInfo.GetComponent<ChunkBilgi>().element = initialLocationBiomes[cellLocation.x, cellLocation.y];
                 tileInfo.transform.parent = tileParent;
                 hexTiles[x, y] = tileInfo;
             }
@@ -278,12 +274,12 @@ public class TileGenerator : MonoBehaviour
             // Check if the tile should be converted to Default
             if (Random.value < defaultTileProbability)
             {
-                tile.tileType = Biome.Default;
+                tile.GetComponent<ChunkBilgi>().element = Element.None;
             }
         }
 
         // 2. Making the Middle Tile Default:
-        hexTiles[tileWidth / 2, tileHeigth / 2].tileType = Biome.Default;
+        hexTiles[tileWidth / 2, tileHeigth / 2].GetComponent<ChunkBilgi>().element = Element.None;
     }
 
     void AssignTileBiomeAppearances()
@@ -294,7 +290,8 @@ public class TileGenerator : MonoBehaviour
         {
             for (int y = 0; y < tileHeigth; y++)
             {
-                TileInfo tile = hexTiles[x, y];
+                ChunkBilgi tile = hexTiles[x, y];
+                ChunkBilgi cb = tile.GetComponent<ChunkBilgi>();
 
                 // Calculate the distance from the tile to the center
                 float distance = Vector3.Distance(tile.transform.position, center);
@@ -303,17 +300,23 @@ public class TileGenerator : MonoBehaviour
                 List<Material> materials = GetMaterialsBasedOnDistance(distance);
 
 
-                print((int)tile.tileType);
+                print((int)cb.element);
                 // Choose a specific material from the list based on the tile's biome. 
-                Material assignedMaterial = materials[(int)tile.tileType];
+                Material assignedMaterial = materials[(int)cb.element];
 
                 var doubleMaterial = new List<Material>() { assignedMaterial, assignedMaterial };
                 tile.GetComponent<Renderer>().materials = doubleMaterial.ToArray();
             }
         }
     }
+}
 
 
-    public enum Biome { Default, Terra, Water, Fire, Auro }
-
+public enum Element
+{
+    None,
+    Ates, 
+    Su, 
+    Toprak, 
+    Hava
 }
