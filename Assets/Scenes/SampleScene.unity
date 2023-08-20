@@ -407,15 +407,16 @@ MonoBehaviour:
   biomeHeigth: 10
   biomeSize: 140
   voronoiDistortionFactor: 0.441
+  hexTilePrefab: {fileID: 980702013641307087, guid: 7df93851f46519c4fac98c9fb181c9d1, type: 3}
   tilePositionParent: {fileID: 2064142439}
   tileParent: {fileID: 640050811}
   tileHeigth: 100
   tileWidth: 100
   tileSpacing: 7
-  hexTilePrefab: {fileID: 980702013641307087, guid: 7df93851f46519c4fac98c9fb181c9d1, type: 3}
+  defaultTileProbability: 0.1
   level2StartingRadius: 280
   level3StartingRadius: 560
-  fadeWidth: 15
+  fadeWidth: 50
   lv1Materials:
   - {fileID: 2100000, guid: 928dc9f3585cba6449d1e0bf7a2ab5ee, type: 2}
   - {fileID: 2100000, guid: f1ff09f45c8bfc5458d486632a8dc1b5, type: 2}

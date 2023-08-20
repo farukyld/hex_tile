@@ -18,12 +18,13 @@ public class TileGenerator : MonoBehaviour
 
 
     [Header("Tile Grid Set Up")]
+    public GameObject hexTilePrefab;
     public Transform tilePositionParent;
     public Transform tileParent;
     public int tileHeigth;
     public int tileWidth;
     public float tileSpacing;
-    public GameObject hexTilePrefab;
+    public float defaultTileProbability = .1f;
 
     private void Start()
     {
@@ -33,6 +34,8 @@ public class TileGenerator : MonoBehaviour
         AssignInitialBiomes();
 
         GenerateGrid();
+
+        ScatterDefaultTiles();
 
         AssignTileBiomeAppearances();
 
@@ -265,7 +268,21 @@ public class TileGenerator : MonoBehaviour
         }
     }
 
+    void ScatterDefaultTiles()
+    {
+        // 1. Scattering Default Type Tiles:
+        foreach (var tile in hexTiles)
+        {
+            // Check if the tile should be converted to Default
+            if (Random.value < defaultTileProbability)
+            {
+                tile.tileType = Biome.Default;
+            }
+        }
 
+        // 2. Making the Middle Tile Default:
+        hexTiles[tileWidth / 2, tileHeigth / 2].tileType = Biome.Default;
+    }
 
     void AssignTileBiomeAppearances()
     {
