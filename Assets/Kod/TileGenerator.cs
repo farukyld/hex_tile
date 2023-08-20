@@ -6,6 +6,7 @@ using Random = UnityEngine.Random;
 
 public class TileGenerator : MonoBehaviour
 {
+    public int seed = 123456;
     public bool debugTilePos;
     public bool debugCellPos;
     [Header("Biome Set Up")]
@@ -28,6 +29,7 @@ public class TileGenerator : MonoBehaviour
 
     private void Start()
     {
+        Random.InitState(seed);
 
         GenerateVoronoiPoints();
 
