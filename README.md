@@ -12,3 +12,9 @@ generate biome distribution with hexagon tiles. used voronoi noise to generate r
 ![image](https://github.com/farukyld/hex_tile/assets/120921965/51f89e0e-d8e2-4930-afc1-078095cd65f8)
 
 ![image](https://github.com/farukyld/hex_tile/assets/120921965/8f4b9e50-cdc7-4850-adc4-6b2af3ef946e)
+
+![image](https://github.com/farukyld/hex_tile/assets/120921965/8aa17b54-2156-4e47-8566-62af6c622940)
+
+![image](https://github.com/farukyld/hex_tile/assets/120921965/6b9ab63d-7057-4536-af4b-df945bd24267)
+
+
