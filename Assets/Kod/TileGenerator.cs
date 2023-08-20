@@ -7,8 +7,6 @@ using Random = UnityEngine.Random;
 
 public class TileGenerator : MonoBehaviour
 {
-    public bool debugTilePos;
-    public bool debugCellPos;
     [Header("Biome Set Up")]
     public Transform cellPositionParent;
     public int biomeWidth;  // Width in number of cells
@@ -20,7 +18,6 @@ public class TileGenerator : MonoBehaviour
 
     [Header("Tile Grid Set Up")]
     public GameObject hexTilePrefab;
-    public Transform tilePositionParent;
     public Transform tileParent;
     public int tileHeigth;
     public int tileWidth;
@@ -64,15 +61,6 @@ public class TileGenerator : MonoBehaviour
                     Vector3 randomOffset = new Vector3(Random.Range(-voronoiDistortionFactor, voronoiDistortionFactor), 0, Random.Range(-voronoiDistortionFactor, voronoiDistortionFactor)) * biomeSize;
                     featurePoints[x, y] = basePos + randomOffset;
                 }
-                if (debugCellPos)
-                {
-                    var debug = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    debug.transform.position = featurePoints[x, y];
-                    debug.transform.localScale = Vector3.one * 1f;
-                    debug.transform.parent = cellPositionParent;
-                    debug.name = "Cell Center (" + x + ", " + y + ")";
-                }
-
             }
         }
     }
@@ -195,17 +183,6 @@ public class TileGenerator : MonoBehaviour
 
                 Vector2Int cellLocation = DetermineVoronoiCell(pos); // !!!! --->> this part may return outside of range index for now. 
 
-                if (debugTilePos)
-                {
-                    var debug = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    debug.transform.parent = this.transform;
-                    debug.transform.position = pos;
-                    var m = debug.GetComponent<Renderer>().material;
-                    m.color = Color.red;
-                    debug.GetComponent<Renderer>().material = m;
-                    debug.name = "tile position: (" + x + ", " + y + ")";
-                    debug.transform.parent = tilePositionParent;
-                }
                 tileInfo.cellLocation = cellLocation;
                 tileInfo.GetComponent<ChunkBilgi>().element = initialLocationBiomes[cellLocation.x, cellLocation.y];
                 tileInfo.transform.parent = tileParent;
@@ -221,6 +198,75 @@ public class TileGenerator : MonoBehaviour
                 hexTiles[x, y].ExtractNeighbors();
             }
         }
+    }
+
+    private void DistortBoundaries()
+    {
+        // Define a scale for the Perlin noise
+        float perlinScale = 0.1f;
+
+        for (int x = 0; x < tileWidth; x++)
+        {
+            for (int y = 0; y < tileHeigth; y++)
+            {
+                ChunkBilgi tile = hexTiles[x, y];
+
+                // Generate a Perlin noise value for the tile position
+                float noiseValue = Mathf.PerlinNoise(tile.transform.position.x * perlinScale, tile.transform.position.z * perlinScale);
+
+                // If the Perlin noise value exceeds a threshold, we change the tile's type
+                if (noiseValue > 0.5f)
+                {
+                    Vector2Int secondClosestCell = FindSecondClosestCell(tile.transform.position);
+                    if (secondClosestCell != new Vector2Int(-1, -1)) // ensure we found a valid second closest cell
+                    {
+                        tile.element = initialLocationBiomes[secondClosestCell.x, secondClosestCell.y];
+                    }
+                }
+            }
+        }
+    }
+
+
+    private Vector2Int FindSecondClosestCell(Vector3 position)
+    {
+        Vector2Int closestCell = DetermineVoronoiCell(position);
+        Vector2Int secondClosestCell = new Vector2Int(-1, -1);
+        float minDistance = float.MaxValue;
+
+        // Find the neighboring voronoi points in the grid, similar to before
+        int x = closestCell.x;
+        int y = closestCell.y;
+
+        Vector2Int[] surroundingPoints = new Vector2Int[]
+        {
+        new Vector2Int(x, y),      // Current cell
+        new Vector2Int(x+1, y),
+        new Vector2Int(x-1, y),
+        new Vector2Int(x, y+1),
+        new Vector2Int(x, y-1),
+        new Vector2Int(x+1, y+1),
+        new Vector2Int(x-1, y-1),
+        new Vector2Int(x-1, y+1),
+        new Vector2Int(x+1, y-1)
+        };
+
+        // Skip the first point since it's the current cell and find the second closest Voronoi point
+        for (int i = 1; i < surroundingPoints.Length; i++)
+        {
+            var point = surroundingPoints[i];
+            if (point.x >= 0 && point.x < biomeWidth && point.y >= 0 && point.y < biomeHeigth)
+            {
+                float dist = Vector3.Distance(position, featurePoints[point.x, point.y]);
+                if (dist < minDistance)
+                {
+                    minDistance = dist;
+                    secondClosestCell = point;
+                }
+            }
+        }
+
+        return secondClosestCell;
     }
 
 

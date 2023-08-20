@@ -400,7 +400,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 475292cc518f9fc46a489e7187791a68, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  seed: 123456
   debugTilePos: 0
   debugCellPos: 0
   cellPositionParent: {fileID: 522492419}
@@ -414,9 +413,9 @@ MonoBehaviour:
   tileHeigth: 120
   tileWidth: 120
   tileSpacing: 7
-  defaultTileProbability: 0.1
-  level2StartingRadius: 280
-  level3StartingRadius: 560
+  defaultTileProbability: 0
+  level2StartingRadius: 700
+  level3StartingRadius: 800
   fadeWidth: 50
   lv1Materials:
   - {fileID: 2100000, guid: 928dc9f3585cba6449d1e0bf7a2ab5ee, type: 2}
