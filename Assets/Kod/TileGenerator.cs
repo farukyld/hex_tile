@@ -95,8 +95,8 @@ public class TileGenerator : MonoBehaviour
 
 
         // Convert the continuous space into grid indices
-        int x = Mathf.FloorToInt(position.x / biomeSize) + 5; // Using size because it's the expected edge length of a Voronoi cell
-        int y = Mathf.FloorToInt(position.z / biomeSize) + 5;
+        int x = Mathf.FloorToInt(position.x / biomeSize) + biomeWidth / 2; // Using size because it's the expected edge length of a Voronoi cell
+        int y = Mathf.FloorToInt(position.z / biomeSize) + biomeHeigth / 2;
 
         print(x + ", " + y);
         // Find the neighboring voronoi points in the grid
